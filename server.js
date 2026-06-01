@@ -10,6 +10,8 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
 
+const roomPlayerOrders = new Map();
+
 // Track active hosts using a Map: Key = hostKey, Value = host's socket.id
 const activeHosts = new Map();
 
@@ -397,6 +399,16 @@ socket.on('disconnect', () => {
   socket.on('round4-turn-over', ({ hostKey }) => {
     // Safe broadcast to wipe player active UI components while preserving room connection parameters
     io.in(hostKey).emit('round4-turn-over');
+  });
+
+  socket.on('reorder-players', ({ hostKey, orderedIds }) => {
+    // 1. Update the authoritative order for this room
+    roomPlayerOrders.set(hostKey, orderedIds);
+    
+    // 2. Broadcast the new sequence to all clients in the room
+    io.in(hostKey).emit('update-player-order', { orderedIds });
+    
+    console.log(`Ordered list updated for room: ${hostKey}`);
   });
 });
 
