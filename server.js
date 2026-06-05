@@ -82,6 +82,7 @@ io.on('connection', (socket) => {
       socket.join(cleanHostKey); 
       console.log(` Host registered room: ${cleanHostKey} (${socket.id})`);
       socket.emit('registration-success', { role, hostKey: cleanHostKey });
+      socket.emit('question-pack', { questionPack: testQuestionPack });
 
       // Synchronize full leaderboard metrics for the host room instantly
       broadcastRoomLeaderboard(cleanHostKey);
@@ -225,6 +226,11 @@ io.on('connection', (socket) => {
   socket.on('get-player-points', ({ targetClientId }) => {
     const accumulatedPoints = playerPointsMap.get(targetClientId) || 0;
     io.to(targetClientId).emit('current-player-points', { points: accumulatedPoints });
+  });
+
+  socket.on('request-question-pack', ({ hostKey }) => {
+    if (!hostKey || socket.data.role !== 'host-server') return;
+    socket.emit('question-pack', { questionPack: testQuestionPack });
   });
 
   socket.on('request-player-points', ({ hostKey, targetClientId }) => {
