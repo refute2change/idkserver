@@ -3,9 +3,12 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(cors());
+
+app.use(express.static(path.join(__dirname, '..', 'idkforthehowmanytimesihavetoremake', 'public')));
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
@@ -20,6 +23,12 @@ const playerPointsMap = new Map();
 
 // Track Round4 steal windows per room: Key = hostKey, Value = { attempt: {id,name} | null }
 const round4StealState = new Map();
+
+const testQuestionPack = {
+  40: [{ points: 10, question: "What is the capital city of France?", answer: "Paris" }, { points: 10, question: "How many legs does a spider have?", answer: "8" }, { points: 20, question: "Which planet is known as the 'Red Planet'?", answer: "Mars" }],
+  60: [{ points: 10, question: "What gas do plants absorb from the atmosphere during photosynthesis?", answer: "Carbon Dioxide" }, { points: 20, question: "Who wrote the famous play 'Romeo and Juliet'?", answer: "William Shakespeare" }, { points: 30, question: "What is the chemical symbol for the element Gold?", answer: "Au" }],
+  80: [{ points: 20, question: "What is the rarest naturally occurring element on Earth?", answer: "Astatine" }, { points: 30, question: "Which mathematician is credited with creating the coordinate geometry system?", answer: "René Descartes" }, { points: 30, question: "In what year did the Berlin Wall come down?", answer: "1989" }]
+}
 
 // =================================================================
 // UNIFIED SOURCE OF TRUTH LEADERBOARD UTILITY BROADCASTER
@@ -262,6 +271,8 @@ io.on('connection', (socket) => {
 
   socket.on('round4-start-timer', ({ hostKey, duration }) => {
     io.in(hostKey).emit('round4-start-timer', { duration });
+    const effect = `${duration}-second`;
+    io.in(hostKey).emit('play-sound-effect', { effect: effect });
   });
 
   socket.on('round4-answer', ({ hostKey, answer }) => {
@@ -283,6 +294,11 @@ io.on('connection', (socket) => {
       playerPointsMap.set(targetClientId, newTotal);
       io.to(targetClientId).emit('player-points-update', { points: newTotal });
       io.to(hostKey).emit('player-points-awarded', { playerId: targetClientId, points: newTotal });
+      io.in(hostKey).emit('play-sound-effect', { effect: 'correct' });
+    }
+    else
+    {
+      io.in(hostKey).emit('play-sound-effect', { effect: 'wrong' });
     }
     io.to(targetClientId).emit('round4-answer-result', { correct, message, points });
 
@@ -293,6 +309,7 @@ io.on('connection', (socket) => {
   socket.on('round4-open-steal-window', ({ hostKey }) => {
     round4StealState.set(hostKey, { attempt: null });
     io.in(hostKey).emit('round4-open-steal-window');
+    io.in(hostKey).emit('play-sound-effect', { effect: 'steal-timer' });
   });
 
   socket.on('round4-close-steal-window', ({ hostKey }) => {
@@ -305,6 +322,7 @@ io.on('connection', (socket) => {
     if (!state || state.attempt) return;
     state.attempt = { id: socket.id, name: socket.data.clientName };
     io.in(hostKey).emit('round4-steal-first', { playerId: socket.id, playerName: socket.data.clientName });
+    io.in(hostKey).emit('play-sound-effect', { effect: 'steal-buzzer' });
   });
 
   socket.on('round4-steal-verdict', ({ hostKey, targetClientId, correct, message, points }) => {
@@ -315,6 +333,7 @@ io.on('connection', (socket) => {
       playerPointsMap.set(targetClientId, newTotal);
       io.to(targetClientId).emit('player-points-update', { points: newTotal });
       io.to(hostKey).emit('player-points-awarded', { playerId: targetClientId, points: newTotal });
+      io.in(hostKey).emit('play-sound-effect', { effect: 'correct' });
     }
     io.to(targetClientId).emit('round4-steal-result', { correct, message, points });
 
